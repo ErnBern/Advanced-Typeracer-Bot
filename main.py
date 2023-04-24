@@ -83,6 +83,8 @@ def change_browser(browser):
             file.write('START=E\n')
             file.write("END=F\n")
             file.write("APPEARANCE=SYSTEM\n")
+
+        Main_Window()
         driver.get("https://play.typeracer.com/")
         return
     
@@ -157,7 +159,6 @@ def main():
             for setting in settings:
                 file.write(setting)
 
-        Main_Window()
         #To avoid issues before the main loop has started
         app.mainloop()
     except:
