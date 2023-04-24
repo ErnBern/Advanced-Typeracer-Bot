@@ -10,7 +10,7 @@ app.title("Advanced Typeracer Bot")
 
 driver = ''
 
-def change_browser(browser):
+def set_driver(browser):
     global driver
     if browser == 'Brave':
         from selenium import webdriver
@@ -69,7 +69,32 @@ def change_browser(browser):
 
         driver = webdriver.Remote(webdriver_service.service_url, options=options)
 
+def change_browser(browser):
+    set_driver(browser)
+
+    #Writing the browser to a settings file
+    with open('settings.txt', 'r') as file:
+        settings = file.readlines()
+    #Only runs if the settings file is blank
+    if settings == []:
+        with open('settings.txt', 'w+') as file:
+            file.write("Do not modify this file!\n")
+            file.write(f'BROWSER={browser}\n')
+            file.write('START=E\n')
+            file.write("END=F\n")
+            file.write("APPEARANCE=SYSTEM\n")
+        driver.get("https://play.typeracer.com/")
+        return
     
+    with open('settings.txt', 'r') as file:
+        settings = file.readlines()
+    settings[1] = f"BROWSER={browser}\n"
+
+    with open('settings.txt', 'w+') as file:
+        for setting in settings:
+            file.write(setting)
+
+
 
 class First_Screen():
     WIDTH = 300
@@ -99,16 +124,53 @@ class First_Screen():
 
         select_browser_button = ctk.CTkButton(
             master = app,
-            command = lambda: print(select_browser_combo.get()),
+            command = lambda: change_browser(select_browser_combo.get()),
             text = 'Confirm',
             font = self.FONT,
         )
         select_browser_button.pack(pady=15)
-        
 
-def main():
-    First_Screen()
-    app.mainloop()
+class Main_Window():
+    WIDTH = 500
+    HEIGHT = 450
+    FONT = (17, 17)
+    def __init__(self):
+        app.geometry(f"{self.WIDTH}x{self.HEIGHT}")
+        for widget in app.winfo_children(): #Refreshing the screen
+            widget.destroy()
+        #This is so the window size can not be modified
+        app.minsize(self.WIDTH, self.HEIGHT)
+        app.maxsize(self.WIDTH, self.HEIGHT)
+
+        app.geometry(f"{self.WIDTH}x{self.HEIGHT}")
+
+
+def main(): 
+    try:
+        #Checking if the settings file exists
+        open('settings.txt', 'x')
+        First_Screen()
+        with open('settings.txt', 'r') as file:
+            settings = file.readlines()
+
+        with open("settings.txt", 'w+') as file:
+            for setting in settings:
+                file.write(setting)
+
+        Main_Window()
+        #To avoid issues before the main loop has started
+        app.mainloop()
+    except:
+    #Getting the settings from the settings file
+        with open('settings.txt', 'r') as file:
+            settings = file.readlines()
+
+        Main_Window()
+        browser = settings[1].strip()
+        browser = browser.split("BROWSER=")[1]
+        set_driver(browser)
+        driver.get("https://play.typeracer.com/")
+        app.mainloop()
 
 if __name__ == "__main__":
     main()
