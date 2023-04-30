@@ -1,14 +1,30 @@
+import time
+import string
+import random
+import asyncio
+import threading
 import selenium
 import customtkinter as ctk
+from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
 
 app = ctk.CTk()
 app.title("Advanced Typeracer Bot")
 
 driver = ''
+run = False
+
+accuracy = ""
+wpm = ""
+
+end_typing_thread = False
+
+#These have to be set as global variables to allow easy access between functions
+start_button = None
+end_button = None
 
 def set_driver(browser):
     global driver
@@ -137,6 +153,7 @@ class Main_Window():
     HEIGHT = 450
     FONT = (17, 17)
     def __init__(self):
+        global start_button, end_button
         app.geometry(f"{self.WIDTH}x{self.HEIGHT}")
         for widget in app.winfo_children(): #Refreshing the screen
             widget.destroy()
@@ -146,8 +163,196 @@ class Main_Window():
 
         app.geometry(f"{self.WIDTH}x{self.HEIGHT}")
 
+        entry_frame = ctk.CTkFrame(app, 100,50, fg_color='transparent')
+        entry_frame.pack()
+        #Labels for the entries
+        ctk.CTkLabel(
+            entry_frame,
+            font=self.FONT,
+            text='Select Accuracy:'
+        ).grid()
+        ctk.CTkLabel(
+            entry_frame,
+            font=self.FONT,
+            text='Select Typing Speed:'
+        ).grid(row=0, column=1)
 
+        #Creating the accuracy combo box
+        accuracy = ctk.CTkComboBox(
+            entry_frame,
+            font=self.FONT,
+            values=[
+            "100%", "90%", "80%", 
+            '70%', '60%', "50%",
+            '40%', '30%', "20%", 
+            "10%" 
+            ],
+            width=90
+        )
+        accuracy.grid(row=1, column=0)
+
+        #Creating the typing speed entry box
+        wpm = ctk.CTkEntry(
+            entry_frame,
+            font=self.FONT,
+            placeholder_text="120",
+            width=100,
+
+        )
+        wpm.grid(row=1, column=1)
+        wpm.insert(0, "120")
+
+        button_frame= ctk.CTkFrame(
+            app,
+            width=100,
+            height=50,
+            fg_color='transparent',
+        )
+        button_frame.pack(pady=10)
+
+        with open('settings.txt', 'r') as f:
+            settings = f.readlines()
+            #Getting the keybinds and removing the "START=" and "END=", and also the "\n"
+            start_keybind = settings[2].split("START=")[1].strip()
+            end_keybind = settings[3].split("END=")[1].strip()
+        
+        start_button = ctk.CTkButton(
+            button_frame,
+            font = self.FONT,
+            text=f"Start ({start_keybind})",
+            width=110,
+            command= lambda:self.start_button_handler(accuracy.get(), wpm.get()) 
+        )
+        start_button.grid(padx=10)
+
+        end_button = ctk.CTkButton(
+            button_frame,
+            font=self.FONT,
+            text=f"Stop ({end_keybind})",
+            width=110,
+            state='disabled',
+            command= lambda:self.end_button_handler()
+        )
+        end_button.grid(row=0, column=1, padx=10)
+
+    def start_button_handler(self, acc, WPM):
+        global accuracy, wpm, run
+        accuracy = acc
+        wpm = WPM
+        run = True
+        start_button.configure(state='disabled')
+        end_button.configure(state='normal')
+
+    def end_button_handler(self):
+        global run
+        run = False
+        start_button.configure(state='normal')
+        end_button.configure(state='disabled')
+
+async def typer():
+    global accuracy, wpm, run
+    last_text = None
+    completed_text = []
+    while True:
+        #So the program does not use up all the CPU
+        await asyncio.sleep(0.05)
+        if end_typing_thread: break
+        if not run: continue
+        #Something to create an inaccuracy
+        def create_inaccuracy(accuracy):
+            #Python needs switch cases ;-;
+            num = random.randint(1, 1)
+            if accuracy == 100:
+                return None
+            if accuracy == 90:
+                if num < 1:
+                    return random.choice(string.ascii_letters)
+            if accuracy == 80:
+                if num < 2:
+                    return random.choice(string.ascii_letters)
+            if accuracy == 70:
+                if num < 3:
+                    return random.choice(string.ascii_letters)
+            if accuracy == 60:
+                if num < 4:
+                    return random.choice(string.ascii_letters)
+            if accuracy == 50:
+                if num < 5:
+                    return random.choice(string.ascii_letters)
+            if accuracy == 40:
+                if num <= 6:
+                    return random.choice(string.ascii_letters)
+            if accuracy == 30:
+                if num <= 7:
+                    return random.choice(string.ascii_letters)
+            if accuracy == 20:
+                if num <= 8:
+                    return random.choice(string.ascii_letters)
+            if accuracy == 10:
+                if num <= 9:
+                    return random.choice(string.ascii_letters)
+            return None #If nothing happens return None
+            
+        accuracy = int(accuracy.split("%")[0])
+
+        try: wpm = int(wpm) # If invalid input set WPM to 120
+        except: wpm = 120
+
+        #Getting the correct delay using different formulas
+        if wpm >= 200:
+            delay = 1 / (wpm * 7 / 60)
+        if wpm < 60:
+            delay = 1 / (wpm * 5 / 60)
+        if 60 <= wpm <= 130:
+            delay = 1 / (wpm * 6 / 60)
+        if 130 < wpm <= 190:
+            delay = 1 / (wpm * 6.5 / 60)
+
+        src = driver.page_source
+        soup = BeautifulSoup(src, "html.parser")
+        text = ''
+        span = soup.findAll("span")
+        for i in span:
+            if "unselectable" in str(i):
+                text += i.text
+        word_input = WebDriverWait(driver, 15).until(EC.element_to_be_clickable((By.CLASS_NAME, "txtInput")))
+        triggered = False
+        #Turns the text from a string into a list of all the chars
+        text = [*text]
+        if text != last_text:
+            completed_text = []
+        if text == last_text:
+            print("asd")
+            triggered = True
+            for char in completed_text:
+                text.remove(char)
+        if not triggered:
+            word_input.clear()
+        for word in text:
+            if not run: break
+            time.sleep(delay)
+            char = create_inaccuracy(accuracy)
+            if char is not None:
+                word_input.send_keys(char)
+                word_input.send_keys(Keys.BACKSPACE)
+                word_input.send_keys(word)
+                completed_text.append(word)
+                continue
+            word_input.send_keys(word)
+            completed_text.append(word)
+        #This is so if the user stops while in the same text it can continue
+        if triggered:
+            run =  False
+            triggered = False
+            continue
+        last_text = text
+        run = False
+
+    
 def main(): 
+    global end_typing_thread
+    typing_thread = threading.Thread(target=lambda:asyncio.run(typer()))
+    typing_thread.start()
     try:
         #Checking if the settings file exists
         open('settings.txt', 'x')
@@ -160,7 +365,7 @@ def main():
                 file.write(setting)
 
         #To avoid issues before the main loop has started
-        app.mainloop()
+        #app.mainloop()
     except:
     #Getting the settings from the settings file
         with open('settings.txt', 'r') as file:
@@ -171,7 +376,9 @@ def main():
         browser = browser.split("BROWSER=")[1]
         set_driver(browser)
         driver.get("https://play.typeracer.com/")
-        app.mainloop()
+    app.mainloop()
+    end_typing_thread = True
+    driver.quit()
 
 if __name__ == "__main__":
     main()
