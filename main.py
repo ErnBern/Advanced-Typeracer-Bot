@@ -6,6 +6,7 @@ import threading
 import selenium
 import customtkinter as ctk
 from bs4 import BeautifulSoup
+from pynput.keyboard import Listener, KeyCode
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
@@ -19,6 +20,10 @@ run = False
 
 accuracy = ""
 wpm = ""
+
+#Variables used to get the accuracy and wpm values when using keybinds
+accuracy_ComboBox = None
+wpm_Entry = None
 
 end_typing_thread = False
 
@@ -153,7 +158,7 @@ class Main_Window():
     HEIGHT = 450
     FONT = (17, 17)
     def __init__(self):
-        global start_button, end_button
+        global start_button, end_button, accuracy_ComboBox, wpm_Entry
         app.geometry(f"{self.WIDTH}x{self.HEIGHT}")
         for widget in app.winfo_children(): #Refreshing the screen
             widget.destroy()
@@ -190,6 +195,7 @@ class Main_Window():
             width=90
         )
         accuracy.grid(row=1, column=0)
+        accuracy_ComboBox = accuracy
 
         #Creating the typing speed entry box
         wpm = ctk.CTkEntry(
@@ -201,6 +207,7 @@ class Main_Window():
         )
         wpm.grid(row=1, column=1)
         wpm.insert(0, "120")
+        wpm_Entry = wpm
 
         button_frame= ctk.CTkFrame(
             app,
@@ -348,11 +355,30 @@ async def typer():
         last_text = text
         run = False
 
+#Function for listening for the starting and ending keys
+async def on_press(key):
+    await asyncio.sleep(0.05)
+    try: key = str(key).split('Key.')[1]
+    #Stopping the char from being wrapped in ""
+    except: key = str(key.char).split()[0]
+    with open('settings.txt', 'r') as f:
+        settings = f.readlines()
+        #Getting the keybinds and removing the "START=" and "END=", and also the "\n"
+        start_keybind = settings[2].split("START=")[1].strip().lower()
+        end_keybind = settings[3].split("END=")[1].strip().lower()
     
+    if key == start_keybind:
+        Main_Window.start_button_handler(None, accuracy_ComboBox.get(), wpm_Entry.get)
+    
+    if key == end_keybind:
+        Main_Window.end_button_handler(None)
+
 def main(): 
     global end_typing_thread
     typing_thread = threading.Thread(target=lambda:asyncio.run(typer()))
     typing_thread.start()
+    keybind_listener = Listener(on_press=lambda key: asyncio.run(on_press(key)))
+    keybind_listener.start()
     try:
         #Checking if the settings file exists
         open('settings.txt', 'x')
