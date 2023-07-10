@@ -117,8 +117,69 @@ def change_browser(browser):
         for setting in settings:
             file.write(setting)
 
+class Preferences(ctk.CTkToplevel):
+    WIDTH = 500
+    HEIGHT = 450
+    FONT= (17, 17)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.geometry(f"{self.WIDTH}x{self.HEIGHT}")
+        self.minsize(self.WIDTH, self.HEIGHT)
+        self.maxsize(self.WIDTH, self.HEIGHT)
+        with open("settings.txt", 'r') as f:
+            #Variable before the \n is removed
+            temp_settings = f.readlines()
+            self.settings = []
+            for setting in temp_settings:
+                #Try statement to ignore the first line
+                try: self.settings.append(setting.strip().split('=')[1]) #Removes all the unnecessary characters 
+                except: continue
+        keybind_frame = ctk.CTkFrame(
+            master=self,
+            fg_color= 'transparent',
+        )
+        keybind_frame.pack()
+        #Entry that displays the current keybind
+        self.keybind_display = ctk.CTkEntry(
+            master=keybind_frame,
+            font=self.FONT,
+            width=200,
+            height=30,
+            justify="center"
+        )
+        self.keybind_display.grid(pady=10, columnspan=5,sticky='ew')
+        self.grid_rowconfigure((0), weight=1) #Centres the entry window
+        #Inserting the text into the entry
+        self.keybind_display.insert(0, f"SELECT KEYBIND")
+        self.keybind_display.configure(state="disabled")
+
+        self.change_start_button = ctk.CTkButton(
+            master=keybind_frame,
+            text="Change Start Keybind",
+            font=self.FONT,
+            command=self.change_start_button,
+        )
+        self.change_start_button.grid(row=1, column=0, padx=10, sticky='w')
+
+        self.change_stop_button = ctk.CTkButton(
+            master=keybind_frame,
+            text="Change Stop Keybind",
+            font=self.FONT,
+            command=self.change_stop_button,
+        )
+        self.change_stop_button.grid(row=1, column=1, padx=10, sticky='e')
+
+        self.grid_columnconfigure((0, 1), weight=1) #Creates and equal distance between the 2 buttons
+
+    def change_start_keybind(self):
+        self.change_start_button.configure(state="disabled")
+        
+
+    def change_stop_keybind(self):
+        pass
 
 
+            
 class First_Screen():
     WIDTH = 300
     HEIGHT = 150
@@ -157,6 +218,7 @@ class Main_Window():
     WIDTH = 500
     HEIGHT = 450
     FONT = (17, 17)
+    TOP_LEVEL_EXISTS = False
     def __init__(self):
         global start_button, end_button, accuracy_ComboBox, wpm_Entry
         app.geometry(f"{self.WIDTH}x{self.HEIGHT}")
@@ -241,6 +303,27 @@ class Main_Window():
             command= lambda:self.end_button_handler()
         )
         end_button.grid(row=0, column=1, padx=10)
+
+        preferences_button = ctk.CTkButton(
+            app,
+            font = self.FONT,
+            text="Preferences",
+            width=110,
+            command=self.open_preferences_window
+        )
+        preferences_button.pack()
+        self.top_level_window = None
+
+
+    def open_preferences_window(self):
+        #Checks if the Windows already 
+        if self.top_level_window is None or not self.top_level_window.winfo_exists():
+            self.TOP_LEVEL_EXISTS = True
+            self.top_level_window = Preferences(app)
+            return
+        #If window exists, focus it
+        self.top_level_window.focus()
+
 
     def start_button_handler(self, acc, WPM):
         global accuracy, wpm, run
@@ -347,7 +430,7 @@ async def typer():
                 continue
             word_input.send_keys(word)
             completed_text.append(word)
-        #This is so if the user stops while in the same text it can continue
+        #This is so if the user stops while in the same text it can continue, sadly it doesn't work if the user types on their own too
         if triggered:
             run =  False
             triggered = False
