@@ -1,5 +1,0 @@
-Do not modify this file!
-BROWSER=Chrome
-START=E
-END=F
-APPEARANCE=SYSTEM
