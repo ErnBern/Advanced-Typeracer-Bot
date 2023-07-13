@@ -612,6 +612,9 @@ async def typer():
             triggered = False
             continue
         last_text = text
+        #Re-enables the start button and disables the end button
+        start_button.configure(state='normal')
+        end_button.configure(state='disabled')
         run = False
 
 #Function for listening for the starting and ending keys
